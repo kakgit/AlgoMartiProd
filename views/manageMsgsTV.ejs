@@ -1,0 +1,153 @@
+<div id="main">
+
+    <div class="page-heading">
+        <h3>Manage Tradingview Messages</h3>
+    </div>
+    <div class="page-content">
+        <section class="row">
+            <div class="col-12 col-lg-9">
+                <div class="row">
+                    <div class="col-6 col-lg-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body px-4 py-4-5">
+                                <div class="row">
+                                    <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                        <div class="stats-icon purple mb-2">
+                                            <i class="iconly-boldShow"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                        <h6 class="text-muted font-semibold">Profile Views</h6>
+                                        <h6 class="font-extrabold mb-0">112.000</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body px-4 py-4-5">
+                                <div class="row">
+                                    <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                        <div class="stats-icon blue mb-2">
+                                            <i class="iconly-boldProfile"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                        <h6 class="text-muted font-semibold">Followers</h6>
+                                        <h6 class="font-extrabold mb-0">183.000</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body px-4 py-4-5">
+                                <div class="row">
+                                    <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                        <div class="stats-icon green mb-2">
+                                            <i class="iconly-boldAdd-User"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                        <h6 class="text-muted font-semibold">Following</h6>
+                                        <h6 class="font-extrabold mb-0">80.000</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body px-4 py-4-5">
+                                <div class="row">
+                                    <div class="col-md-4 col-lg-12 col-xl-12 col-xxl-5 d-flex justify-content-start ">
+                                        <div class="stats-icon red mb-2">
+                                            <i class="iconly-boldBookmark"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8 col-lg-12 col-xl-12 col-xxl-7">
+                                        <h6 class="text-muted font-semibold">Saved Post</h6>
+                                        <h6 class="font-extrabold mb-0">112</h6>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4>Tradingview Messages</h4>
+                            </div>
+                            <div class="card-body">
+                                <!-- table responsive -->
+                                <section class="section">
+                                    <div class="row" id="table-responsive">
+                                        <div class="col-12">
+                                          <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                              <thead>
+                                                <tr>
+                                                    <th scope="col">#</th>
+                                                    <th scope="col">Date Time</th>
+                                                    <th scope="col">Symbol Name</th>
+                                                    <th scope="col">Indicator</th>
+                                                    <th scope="col">Direction</th>
+                                                    <th scope="col">Strike</th>
+                                                    <th scope="col" colspan="3">Action</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                <% for(let i=0; i<tvMsgs.length; i++) { %>
+                                                    <tr>
+                                                        <td><%= i + 1 %></td>
+                                                        <td><%= tvMsgs[i].createdAt %></td>
+                                                        <td><%= tvMsgs[i].symbolName %></td>
+                                                        <td><%= tvMsgs[i].indType %></td>
+                                                        <td><%= tvMsgs[i].direction %></td>
+                                                        <td><%= tvMsgs[i].strike %></td>
+                                                        <td>
+                                                            <a class="btn btn-delete" data-id="<%= tvMsgs[i]._id %>" onclick="fnDeleteTvMsg(this);">
+                                                                <i class="fa fa-trash-o" style="font-size:17px;color:red;cursor: pointer;" aria-hidden="true"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                <% } %>
+                                            </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Recent Messages</h4>
+                    </div>
+                    <div class="card-body">
+
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Visitors Profile</h4>
+                    </div>
+                    <div class="card-body">
+
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+
+<script src="/js/manageMsgsTV.js"></script>
