@@ -16,18 +16,30 @@ const kotakLiveControllerNS = require("../controller/controllerKotakScalper.js")
 const kotakPaperController = require("../controller/controllerKotakPaper.js");
 const deltaLiveController = require("../controller/controllerDeltaLive.js");
 const deltaFutDemoController = require("../controller/controllerDeltaFutDemo.js");
+const deltaFutScprDemoController = require("../controller/controllerDeltaFutScprDemo.js");
+const deltaFutLiveController = require("../controller/controllerDeltaFutLive.js");
+const deltaFutScprLiveController = require("../controller/controllerDeltaFutScprLive.js");
+const deltaOptDemoController = require("../controller/controllerDeltaOptDemo.js");
+const deltaFundingLiveCtrler = require("../controller/controllerDeltaFundingLive.js");
+const deltaSStraddleLiveCtrler = require("../controller/cntrDeltaSStraddleL.js");
+const strategy1FOCtrler = require("../controller/cntrStrategy1FO.js");
+const strategy2FOCtrler = require("../controller/cntrStrategy2FO.js");
+const liveStrategy1FOCtrler = require("../controller/cntrLiveStrategy1FO.js");
+const deltaSStrangleLiveCtrler = require("../controller/cntrDeltaSStrangleL.js");
+const ctrlCryptoFunding = require("../controller/controllerCryptoFunding.js");
+const ctrlCryptoFundingV2 = require("../controller/controllerCryptoFundingV2.js");
 
 //home Routes
 route.get("/", homeServices.defaultRoute);
 
-//Paper Trade Routes
-route.get("/paperTrade", homeServices.paperTrade);
+// //Paper Trade Routes
+// route.get("/paperTrade", homeServices.paperTrade);
 
 //Tradingview Signals Routes
 route.get("/mahesh", homeServices.signalsTV);
 
-//Alice Live Route
-route.get("/aliceLive", aliceLiveServices.defaultRoute);
+// //Alice Live Route
+// route.get("/aliceLive", aliceLiveServices.defaultRoute);
 
 //Kotak Paper Route
 route.get("/kotakPaper", kotakPaperController.defaultRoute);
@@ -46,13 +58,39 @@ route.get("/deltaLive", deltaLiveController.defaultRoute);
 
 //Delta Futures Demo Route
 route.get("/deltaFutures-Demo", deltaFutDemoController.defaultRoute);
+route.get("/DeltaFutScprDemo", deltaFutScprDemoController.defaultRoute);
+route.get("/DeltaFutScprLive", deltaFutScprLiveController.defaultRoute);
 
-//Samco Routes
-route.get("/samco", samcoServices.defaultRoute);
+//Delta Futures Live Route
+route.get("/deltaFutures-Live", deltaFutScprLiveController.defaultRoute);
 
-//Samco Routes
-route.get("/finvasia", finvasiaServices.defaultRoute);
-route.post("/finvasia/getSession", finvasiaServices.fnLoginFinvasia);
+//Delta Options Demo Route
+route.get("/deltaOptions-Demo", deltaOptDemoController.defaultRoute);
+
+//Delta Funding Demo Route
+route.get("/deltaFunding-Live", deltaFundingLiveCtrler.defaultRoute);
+
+//Delta Short Straddle Live Route
+route.get("/deltaSStraddleLive", deltaSStraddleLiveCtrler.defaultRoute);
+
+//Strategy1FO Route
+route.get("/Strategy1FO", strategy1FOCtrler.defaultRoute);
+route.get("/Strategy2FO", strategy2FOCtrler.defaultRoute);
+route.get("/LiveStrategy1FO", liveStrategy1FOCtrler.defaultRoute);
+
+//Delta Short Strangle Live Route
+route.get("/deltaSStrangleLive", deltaSStrangleLiveCtrler.defaultRoute);
+
+//Crypto Funding Route
+route.get("/cryptoFunding", ctrlCryptoFunding.defaultRoute);
+route.get("/cryptoFundingV2", ctrlCryptoFundingV2.defaultRoute);
+
+// //Samco Routes
+// route.get("/samco", samcoServices.defaultRoute);
+
+// //Samco Routes
+// route.get("/finvasia", finvasiaServices.defaultRoute);
+// route.post("/finvasia/getSession", finvasiaServices.fnLoginFinvasia);
 
 //manageMsgsTV Routes
 //API
@@ -150,11 +188,101 @@ route.post("/deltaExc/validateLogin", deltaLiveController.fnValidateUserLogin);
 route.post("/deltaExc/getSpotPriceByProd", deltaLiveController.fnGetSpotPriceByProd);
 route.post("/deltaExc/getProdBySymbol", deltaLiveController.fnGetProdBySymbol);
 
-//Delta Futures Routes
+//Delta Futures Live Routes
+route.post("/deltaExcFutR/validateLogin", deltaFutLiveController.fnValidateUserLogin);
+route.post("/deltaExcFutR/placeRealOrder", deltaFutLiveController.fnPlaceOrderSDK);
+route.post("/deltaExcFutR/getOrderDetails", deltaFutLiveController.fnGetOrderDetails);
+route.post("/deltaExcFutR/editPendingOrder", deltaFutLiveController.fnEditOrderSDK);
+route.post("/deltaExcFutR/cancelPendingOrder", deltaFutLiveController.fnCancelOrderSDK);
+route.post("/deltaExcFutR/getFilledPosById", deltaFutLiveController.fnGetOpenPositionByIdSDK);
+route.post("/deltaExcFutR/getNetPositionByProduct", deltaFutLiveController.fnGetNetPositionByProductSDK);
+route.post("/deltaExcFutR/getFilledOrderHistory", deltaFutLiveController.fnGetFilledOrderHistory);
+route.post("/deltaExcFutR/getProductsList", deltaFutLiveController.fnGetProductsList);
+route.post("/deltaExcFutR/closeRealPosition", deltaFutLiveController.fnCloseRealPoistion);
+
+//Delta Funding Live Routes
+route.post("/deltaExcFunding/validateLogin", deltaFundingLiveCtrler.fnValidateUserLogin);
+route.post("/deltaExcFunding/getOptChnSDKByAstOptTypExp", deltaFundingLiveCtrler.fnGetOptChnSDKByAstOptTypExp);
+route.post("/deltaExcFunding/execOption", deltaFundingLiveCtrler.fnExecOptionByOptTypeExpTransType);
+route.post("/deltaExcFunding/getBestRatesBySymb", deltaFundingLiveCtrler.fnGetBestRatesBySymbol);
+
+//Delta Short Straddle Live Routes
+route.post("/deltaSStraddleLive/validateLogin", deltaSStraddleLiveCtrler.fnValidateUserLogin);
+route.post("/deltaSStraddleLive/getWalletDetails", deltaSStraddleLiveCtrler.fnWalletDetails);
+route.post("/deltaSStraddleLive/getOptChnSDKByAstOptTypExp", deltaSStraddleLiveCtrler.fnGetOptChnSDKByAstOptTypExp);
+route.post("/deltaSStraddleLive/execOption", deltaSStraddleLiveCtrler.fnExecOptionByOptTypeExpTransType);
+route.post("/deltaSStraddleLive/getBestRatesBySymb", deltaSStraddleLiveCtrler.fnGetBestRatesBySymbol);
+route.post("/deltaSStraddleLive/getRealOpenPos", deltaSStraddleLiveCtrler.fnGetRealOpenPositions);
+route.post("/deltaSStraddleLive/getRealClsdPos", deltaSStraddleLiveCtrler.fnGetRealClsdPositions);
+route.post("/deltaSStraddleLive/openRealPosition", deltaSStraddleLiveCtrler.fnOpenRealPoistion);
+route.post("/deltaSStraddleLive/closeRealPosition", deltaSStraddleLiveCtrler.fnCloseRealPoistion);
+
+//Strategy1FO Routes
+route.post("/strategy1fo/validateLogin", strategy1FOCtrler.fnValidateUserLogin);
+route.post("/strategy1fo/getOptChnSDKByAstOptTypExp", strategy1FOCtrler.fnGetOptChnSDKByAstOptTypExp);
+route.post("/strategy1fo/execOption", strategy1FOCtrler.fnExecOptionByOptTypeExpTransType);
+route.post("/strategy1fo/execOptionLeg", strategy1FOCtrler.fnExecOptByOTypExpTType);
+route.post("/strategy1fo/execFutureLeg", strategy1FOCtrler.fnExecFutByTType);
+route.post("/strategy1fo/getBestRatesBySymb", strategy1FOCtrler.fnGetBestRatesBySymbol);
+route.post("/strategy2fo/validateLogin", strategy2FOCtrler.fnValidateUserLogin);
+route.post("/strategy2fo/getOptChnSDKByAstOptTypExp", strategy2FOCtrler.fnGetOptChnSDKByAstOptTypExp);
+route.post("/strategy2fo/execOption", strategy2FOCtrler.fnExecOptionByOptTypeExpTransType);
+route.post("/strategy2fo/execOptionLeg", strategy2FOCtrler.fnExecOptByOTypExpTType);
+route.post("/strategy2fo/execFutureLeg", strategy2FOCtrler.fnExecFutByTType);
+route.post("/strategy2fo/getBestRatesBySymb", strategy2FOCtrler.fnGetBestRatesBySymbol);
+route.post("/liveStrategy1fo/validateLogin", liveStrategy1FOCtrler.fnValidateUserLogin);
+route.post("/liveStrategy1fo/getOptChnSDKByAstOptTypExp", liveStrategy1FOCtrler.fnGetOptChnSDKByAstOptTypExp);
+route.post("/liveStrategy1fo/execOption", liveStrategy1FOCtrler.fnExecOptionByOptTypeExpTransType);
+route.post("/liveStrategy1fo/execOptionLeg", liveStrategy1FOCtrler.fnExecOptByOTypExpTType);
+route.post("/liveStrategy1fo/execFutureLeg", liveStrategy1FOCtrler.fnExecFutByTType);
+route.post("/liveStrategy1fo/closeLeg", liveStrategy1FOCtrler.fnCloseLeg);
+route.post("/liveStrategy1fo/getLiveOpenPositions", liveStrategy1FOCtrler.fnGetLiveOpenPositions);
+route.post("/liveStrategy1fo/getBestRatesBySymb", liveStrategy1FOCtrler.fnGetBestRatesBySymbol);
+route.post("/liveStrategy1fo/getFilledOrderHistory", liveStrategy1FOCtrler.fnGetFilledOrderHistory);
+//Delta Short Strangle Live Routes
+route.post("/deltaSStrangleLive/validateLogin", deltaSStrangleLiveCtrler.fnValidateUserLogin);
+route.post("/deltaSStrangleLive/getWalletDetails", deltaSStrangleLiveCtrler.fnWalletDetails);
+route.post("/deltaSStrangleLive/execOption", deltaSStrangleLiveCtrler.fnExecOptionByOptTypeExpTransType);
+route.post("/deltaSStrangleLive/getBestRatesBySymb", deltaSStrangleLiveCtrler.fnGetBestRatesBySymbol);
+route.post("/deltaSStrangleLive/getRealOpenPos", deltaSStrangleLiveCtrler.fnGetRealOpenPositions);
+route.post("/deltaSStrangleLive/openRealPosition", deltaSStrangleLiveCtrler.fnOpenRealPoistion);
+route.post("/deltaSStrangleLive/closeRealPosition", deltaSStrangleLiveCtrler.fnCloseRealPoistion);
+route.post("/deltaSStrangleLive/getRealClsdPos", deltaSStrangleLiveCtrler.fnGetRealClsdPositions);
+route.post("/deltaSStrangleLive/getOptChnSDKByAstOptTypExp", deltaSStrangleLiveCtrler.fnGetOptChnSDKByAstOptTypExp);
+
+//Crypto Funding Routes
+route.post("/execCryptoFunding/DeltaCredValidate", ctrlCryptoFunding.fnDeltaCredValidate);
+route.post("/execCryptoFunding/CDcxCredValidate", ctrlCryptoFunding.fnCDcxCredValidate);
+route.post("/execCryptoFunding/updCoinDcxDeltaData", ctrlCryptoFunding.fnUpdCoindcxDeltaCoinsList);
+route.post("/execCryptoFunding/getCoinDcxDeltaData", ctrlCryptoFunding.fnGetCoinDcxDeltaData);
+route.post("/execCryptoFunding/getDeltaCoinList", ctrlCryptoFunding.fnGetDeltaCoinsList);
+route.post("/execCryptoFunding/getCdcxCoinList", ctrlCryptoFunding.fnGetCdcxCoinsList);
+route.post("/execCryptoFunding/getCdcxCoinDetails", ctrlCryptoFunding.fnGetCdcxCoinsDetails);
+route.post("/execCryptoFunding/getDeltaFundingList", ctrlCryptoFunding.fnGetDeltaFundingList);
+route.post("/execCryptoFunding/updDeltaLeverage", ctrlCryptoFunding.fnUpdateDeltaLeverage);
+route.post("/execCryptoFunding/execOpenOrderCDcx", ctrlCryptoFunding.fnExecOpenOrderCDcx);
+
+//Crypto Funding V2 Routes
+route.post("/execCryptoFundingV2/DeltaCredValidate", ctrlCryptoFundingV2.fnDeltaCredValidate);
+route.post("/execCryptoFundingV2/refreshFundingData", ctrlCryptoFundingV2.fnRefreshFundingData);
+route.post("/execCryptoFundingV2/getLatestTradeRates", ctrlCryptoFundingV2.fnGetLatestTradeRates);
+route.post("/execCryptoFundingV2/previewRealTrade", ctrlCryptoFundingV2.fnPreviewRealTrade);
+route.post("/execCryptoFundingV2/executeRealTrade", ctrlCryptoFundingV2.fnExecuteRealTrade);
+
+//Delta Futures Demo Routes
 route.post("/deltaExcFut/validateLogin", deltaFutDemoController.fnValidateUserLogin);
 route.post("/deltaExcFut/getHistOHLC", deltaFutDemoController.fnHistoricalOHLCAPI);
 route.post("/deltaExcFut/getCurrBSRates", deltaFutDemoController.fnGetCurrBuySellRates);
+route.post("/deltaExcFut/placeLimitOrder", deltaFutDemoController.fnPlaceLimitOrderSDK);
+route.post("/deltaFutScprDemo/validateLogin", deltaFutScprDemoController.fnValidateUserLogin);
+route.post("/deltaFutScprDemo/getHistOHLC", deltaFutScprDemoController.fnHistoricalOHLCAPI);
+route.post("/deltaFutScprDemo/getCurrBSRates", deltaFutScprDemoController.fnGetCurrBuySellRates);
+route.post("/deltaFutScprDemo/placeLimitOrder", deltaFutScprDemoController.fnPlaceLimitOrderSDK);
 
+//Delta Options Routes
+route.post("/deltaExcOpt/getOptionChainSDK", deltaOptDemoController.fnGetOptionChainSDK);
+route.post("/deltaExcOpt/getOptChnSDKByAstOptTypExp", deltaOptDemoController.fnGetOptChnSDKByAstOptTypExp);
+route.post("/deltaExcOpt/getBestRatesBySymb", deltaOptDemoController.fnGetBestRatesBySymbol);
 
 //Samples
 route.post("/deltaExc/getTestWalletAPI", deltaLiveController.fnTestWalletAPI);

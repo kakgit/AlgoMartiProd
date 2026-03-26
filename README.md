@@ -1,2 +1,2 @@
-# AlgoMartiProd
-
+# AlgoMarti
+ Algo Martingale Strategy App

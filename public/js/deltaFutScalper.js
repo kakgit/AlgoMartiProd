@@ -1,9 +1,9 @@
 let objDeltaWS = null;
 let gByorSl = "";
 let gCurrPos = null;
-let gBuyPrice, gSellPrice, gLotSize, gQty, gAmtSL, gAmtTP, gCharges, gCapital, gOrderDT = 0;
-let gBrokerage = 0.02;
-let gMaxTradeTime = 15;
+let gBuyPrice, gSellPrice, gLotSize, gQty, gAmtSL, gAmtTP1, gAmtTP, gCharges, gCapital, gOrderDT = 0;
+let gBrokerage = 0.05;
+let gMaxTradeTime = 30;
 let gLeverage = 160;
 let gTimerID = 0;
 let gTimeDiff = 900;
@@ -13,6 +13,10 @@ let gOldPLAmt = 0;
 let gNewPLAmt = 0;
 let gPL = 0;
 let gHisCandleMins = 1; //Eg: 1, 3, 5, 15, 30
+let gSubInterval = 0;
+let gManualSubIntvl = 0;
+let gForceCloseDFL = false;
+let g50Perc1Time = true;
 
 window.addEventListener("DOMContentLoaded", function(){
 	fnGetAllStatus();
@@ -20,15 +24,20 @@ window.addEventListener("DOMContentLoaded", function(){
     socket.on("CdlEmaTrend", (pMsg) => {
         let objTradeSideVal = document["frmSide"]["rdoTradeSide"];
         let objJson = JSON.parse(pMsg);
+        // let objQty = document.getElementById("txtStartQty");
+        // objQty.value = objJson.Qty;
+        // fnChangeStartQty(objQty);
 
-        if(objJson.Direc === "UP"){
-            objTradeSideVal.value = true;
-        }
-        else if(objJson.Direc === "DN"){
-            objTradeSideVal.value = false;
-        }
-        else{
-            objTradeSideVal.value = -1;
+        if(objJson.Indc === 1){
+	        if(objJson.Direc === "UP"){
+	            objTradeSideVal.value = true;
+	        }
+	        else if(objJson.Direc === "DN"){
+	            objTradeSideVal.value = false;
+	        }
+	        else{
+	            objTradeSideVal.value = -1;
+	        }
         }
         fnTradeSide();
     });
@@ -37,23 +46,30 @@ window.addEventListener("DOMContentLoaded", function(){
         let isLsAutoTrader = localStorage.getItem("isDeltaAutoTrader");
         let vTradeSide = localStorage.getItem("TradeSideSwtS");
 
-        // console.log(vTradeSide);
-
-        if(isLsAutoTrader === "false"){
-            fnGenMessage("Trade Order Received, But Auto Trader is OFF!", "badge bg-warning", "spnGenMsg");
-        }
-        else{
-        	if(((vTradeSide === "true") && (pMsg.TransType === "buy")) || ((vTradeSide === "false") && (pMsg.OptionType === "sell")) || (vTradeSide === "-1")){
-	            fnInitiateManualFutures(pMsg.TransType);
-        	}
-        	else{
-                fnGenMessage(pMsg.TransType +" Trade Message Received, But Not Executed!", "badge bg-warning", "spnGenMsg");
-        	}
+        if(pMsg.Indc === 1){
+	        if(isLsAutoTrader === "false"){
+	            fnGenMessage("Trade Order Received, But Auto Trader is OFF!", "badge bg-warning", "spnGenMsg");
+	        }
+	        else{
+	        	if(((vTradeSide === "true") && (pMsg.TransType === "buy")) || ((vTradeSide === "false") && (pMsg.TransType === "sell")) || (vTradeSide === "-1")){
+		            fnInitiateManualFutures(pMsg.TransType);
+	        	}
+	        	else{
+	                fnGenMessage(pMsg.TransType +" Trade Message Received, But Not Executed!", "badge bg-warning", "spnGenMsg");
+	        	}
+	        }
         }
     });
 
     socket.on("tv-btcusd-close", (pMsg) => {
-        fnCloseManualFutures(pMsg.TransType);
+        if(pMsg.Indc === 1){
+	        fnCloseManualFutures(pMsg.TransType);
+        }
+    });
+
+    socket.on("tv-AutoTrade", (pMsg) => {
+    	localStorage.setItem("isDeltaAutoTrader", pMsg.AutoTrade);
+    	fnGetSetAutoTraderStatus();
     });
 });
 
@@ -63,19 +79,51 @@ function fnGetAllStatus(){
 	if(bAppStatus){
         fnGetSetTraderLoginStatus();
 		fnGetSetAutoTraderStatus();
+		fnLoadDefSymbol();
+		fnLoadMarti();
+		fnLoadYetToRec();
 		fnLoadDefQty();
 		fnLoadLossRecoveryMultiplier();
 		fnLoadCurrentTradePos();
 		// UNCOMMENT for LIVE TRADING in DEMO
 		fnSubscribe();
-		fnGetHistoricalOHLC();
-		fnSubscribeInterval();
+		// fnGetHistoricalOHLC();
+		// fnSubscribeInterval();
 		// UNCOMMENT for LIVE TRADING in DEMO
 		fnSetInitFutTrdDtls();
 		fnLoadSlTp();
 		fnLoadTodayTrades();
+		fnLoadTradeCounter();
 
 		fnLoadTradeSide();
+	}
+}
+
+function fnLoadDefSymbol(){
+	let objDefSymM = JSON.parse(localStorage.getItem("DeltaDefSymbFut"));
+	let objSelSymb = document.getElementById("ddlFuturesSymbols");
+
+	if(objDefSymM === null){
+		objDefSymM = "";
+	}
+
+	objSelSymb.value = objDefSymM;
+	fnSetSymbolData(objDefSymM);
+}
+
+function fnSetSymbolData(pThisVal){
+	let objLotSize = document.getElementById("txtLotSize");
+
+	localStorage.setItem("DeltaDefSymbFut", JSON.stringify(pThisVal));
+
+	if(pThisVal === "BTCUSD"){
+		objLotSize.value = 0.001;
+	}
+	else if(pThisVal === "ETHUSD"){
+		objLotSize.value = 0.01;
+	}
+	else{
+		objLotSize.value = 0;
 	}
 }
 
@@ -137,6 +185,64 @@ function fnUpdateMultiplierX(pThisVal){
 	gMultiplierX = pThisVal.value;
 }
 
+function fnLoadTradeCounter(){
+	let objCounterSwtM = JSON.parse(localStorage.getItem("CounterSwtDelta"));
+	let objCounterSwt = document.getElementById("swtTradeCounter");
+
+	if(objCounterSwtM){
+		objCounterSwt.checked = true;
+	}
+	else{
+		objCounterSwt.checked = false;
+	}
+}
+
+function fnLoadMarti(){
+    let vMartiM = JSON.parse(localStorage.getItem("DeltaFutMarti"));
+    let objSwtMarti = document.getElementById("swtMartingale");
+
+    if(vMartiM){
+    	objSwtMarti.checked = true;
+    }
+    else{
+    	objSwtMarti.checked = false;
+    }
+}
+
+function fnLoadYetToRec(){
+    let vYet2RecM = JSON.parse(localStorage.getItem("Yet2RecFutScrD"));
+    let objSwtYet2Rec = document.getElementById("swtYetToRec");
+
+    if(vYet2RecM){
+    	objSwtYet2Rec.checked = true;
+    }
+    else{
+    	objSwtYet2Rec.checked = false;
+    }
+}
+
+function fnUpdateYet2RecSwt(){
+	let objSwtYet2Rec = document.getElementById("swtYetToRec");
+
+	if(objSwtYet2Rec.checked){
+		localStorage.setItem("Yet2RecFutScrD", true);
+	}
+	else{
+		localStorage.setItem("Yet2RecFutScrD", false);
+	}
+}
+
+function fnUpdateTrdSwtCounter(){
+	let objCounterSwt = document.getElementById("swtTradeCounter");
+
+	if(objCounterSwt.checked){
+		localStorage.setItem("CounterSwtDelta", true);
+	}
+	else{
+		localStorage.setItem("CounterSwtDelta", false);
+	}
+}
+
 function fnChangeStartQty(pThisVal){
     let objQty = document.getElementById("txtFuturesQty");
 
@@ -154,10 +260,10 @@ function fnChangeStartQty(pThisVal){
         fnGenMessage("No of Qty to Start With is Changed!", `badge bg-success`, "spnGenMsg");
         localStorage.setItem("StartQtyNoDelta", pThisVal.value);
 
-        if(confirm("Are You Sure You want to change the Quantity?")){
+        // if(confirm("Are You Sure You want to change the Quantity?")){
             objQty.value = pThisVal.value;
             localStorage.setItem("QtyMulDelta", pThisVal.value);
-        }
+        // }
     }
 }
 
@@ -169,6 +275,7 @@ function fnLoadCurrentTradePos(){
 
 function fnCloseWS(){
 	if(objDeltaWS !== null){
+		clearInterval(gSubInterval);
 		objDeltaWS.close();
 	}
 	else{
@@ -177,31 +284,37 @@ function fnCloseWS(){
 }
 
 function fnConnectWS(){
+    let objSub = document.getElementById("spnSub");
+
     let vUrl = "wss://socket.india.delta.exchange";
     objDeltaWS = new WebSocket(vUrl);
 
     objDeltaWS.onopen = function (){
-        // let vSendData = { "type": "subscribe", "payload": { "channels": [{ "name": "v2/ticker", "symbols": ["BTCUSD"] }]}};
-
-        // objDeltaWS.send(JSON.stringify(vSendData));
-        console.log("Conn Started......");
         fnGenMessage("Streaming Connection Started and Open!", `badge bg-success`, "spnGenMsg");
+        // console.log("WS is Open!");
+    }
+    objDeltaWS.onerror = function (){
+        setTimeout(fnSubscribe, 3000);
+        console.log("WS Error, Trying to Reconnect.....");
     }
     objDeltaWS.onclose = function (){
 		let objSpotPrice = document.getElementById("txtSpotPrice");
 		let objBestBuy = document.getElementById("txtBestBuyPrice");
 		let objBestSell = document.getElementById("txtBestSellPrice");
 
-		objDeltaWS = null;
-		objSpotPrice.value = "";
-		objBestBuy.value = "";
-		objBestSell.value = "";
-
-        console.log("Conn Closed....");
-        fnGenMessage("Streaming Connection Closed!", `badge bg-danger`, "spnGenMsg");
-    }
-    objDeltaWS.onerror = function (){
-        console.log("Conn Error");
+        if(gForceCloseDFL){
+            gForceCloseDFL = false;
+            // console.log("WS Disconnected & Closed!!!!!!");
+            objSub.className = "badge rounded-pill text-bg-success";
+			objSpotPrice.value = "";
+			objBestBuy.value = "";
+			objBestSell.value = "";
+            fnGenMessage("Streaming Stopped & Disconnected!", `badge bg-warning`, "spnGenMsg");
+        }
+        else{
+            fnSubscribe();
+            // console.log("Restarting WS....");
+        }
     }
 	objDeltaWS.onmessage = function (pMsg){
         let vTicData = JSON.parse(pMsg.data);
@@ -213,15 +326,17 @@ function fnConnectWS(){
 				fnGetRates(vTicData);
 				break;
 			case "candlestick_5m":
-				fnGetOHLC(vTicData);
+				// fnGetOHLC(vTicData);
+				console.log("#######################");
 				break;
 			case "subscriptions":
-
 	            fnGenMessage("Streaming Subscribed and Started!", `badge bg-success`, "spnGenMsg");
+	            objSub.className = "badge rounded-pill text-bg-success blink";
 				break;
 			case "unsubscribed":
 
 	            fnGenMessage("Streaming Unsubscribed!", `badge bg-warning`, "spnGenMsg");
+                objSub.className = "badge rounded-pill text-bg-success";
 				break;
 		}
 	}
@@ -229,8 +344,9 @@ function fnConnectWS(){
 
 function fnSubscribeInterval(){
 	// console.log("Interval subscription.....");
-	setInterval(fnSubscribe, 60000);
-	setInterval(fnGetHistoricalOHLC, 60000);
+	clearInterval(gSubInterval);
+	gSubInterval = setInterval(fnSubscribe, 60000);
+	// setInterval(fnGetHistoricalOHLC, 60000);
 }
 
 function fnSubscribe(){
@@ -242,9 +358,22 @@ function fnSubscribe(){
 		setTimeout(fnSubscribe, 3000);
 	}
 	else{
-	    let vSendData = { "type": "subscribe", "payload": { "channels": [{ "name": "v2/ticker", "symbols": [ objDdlSymbol.value ] }]}};
 		// console.log("Subscribing to Channel....");
-	    objDeltaWS.send(JSON.stringify(vSendData));
+
+        const vTimer = setInterval(() => {
+            if(objDeltaWS.readyState === 1){
+                clearInterval(vTimer);
+                //Write Subscription code here
+			    let vSendData = { "type": "subscribe", "payload": { "channels": [{ "name": "v2/ticker", "symbols": [ objDdlSymbol.value ] }]}};
+
+			    objDeltaWS.send(JSON.stringify(vSendData));
+                // console.log("Subscribing............");
+            }
+            else{
+                // console.log("Trying to Reconnect...");
+                fnConnectWS();
+            }
+        }, 3000);
 	}
 }
 
@@ -254,15 +383,24 @@ function fnUnsubscribe(){
 	let objBestSell = document.getElementById("txtBestSellPrice");
 
 	if(objDeltaWS === null){
-		// fnConnectWS();
-		// console.log("WS Not Connected and looping again...");
-		// setTimeout(fnUnsubscribe, 3000);
-	    fnGenMessage("Already Streaming is Unsubscribed & Disconnected!", `badge bg-warning`, "spnGenMsg");
+		fnConnectWS();
+		setTimeout(fnUnsubscribe, 3000);
+	    // fnGenMessage("Already Streaming is Unsubscribed & Disconnected!", `badge bg-warning`, "spnGenMsg");
 	}
 	else{
-	    let vSendData = { "type": "unsubscribe", "payload": { "channels": [{ "name": "v2/ticker" }]}};
+        const vTimer = setInterval(() => {
+            if(objDeltaWS.readyState === 1){
+                clearInterval(vTimer);
+			    let vSendData = { "type": "unsubscribe", "payload": { "channels": [{ "name": "v2/ticker" }]}};
 
-	    objDeltaWS.send(JSON.stringify(vSendData));
+			    objDeltaWS.send(JSON.stringify(vSendData));
+                // console.log("UnSubscribing........!!!!!");
+            }
+            else{
+                // console.log("Trying to Reconnect...");
+                fnConnectWS();
+            }
+        }, 3000);
 	}
 	objSpotPrice.value = "";
 	objBestBuy.value = "";
@@ -281,61 +419,69 @@ function fnGetRates(pTicData){
 	if(gCurrPos !== null){
 		fnUpdateOpnPosStatus();
 	}
-	else{
-        let isLsAutoTrader = localStorage.getItem("isDeltaAutoTrader");
-        // let vTradeSide = localStorage.getItem("TradeSideSwtS");
+	// else{
+	// 	fnExecInternalStrategy();
+	// }
+}
 
-        if(isLsAutoTrader === "false"){
-            fnGenMessage("Trade Order Received, But Auto Trader is OFF!", "badge bg-warning", "spnGenMsg");
-        }
-        else{
-			let vOpen = parseFloat(document.getElementById("txtCandleOpen").value);
-			let vHigh = parseFloat(document.getElementById("txtCandleHigh").value);
-			let vLow = parseFloat(document.getElementById("txtCandleLow").value);
-			let vClose = parseFloat(document.getElementById("txtCandleClose").value);
-			let vBestBuy = parseFloat(objBestBuy.value);
-			let vBestSell = parseFloat(objBestSell.value);
-			let vTopWick = 0;
-			let vBottomWick = 0;
+function fnExecInternalStrategy(){
+	let objSpotPrice = document.getElementById("txtSpotPrice");
+	let objBestBuy = document.getElementById("txtBestBuyPrice");
+	let objBestSell = document.getElementById("txtBestSellPrice");
+    let isLsAutoTrader = localStorage.getItem("isDeltaAutoTrader");
+    // let vTradeSide = localStorage.getItem("TradeSideSwtS");
 
-			if(vOpen < vClose){
-				vTopWick = vHigh - vClose;
-				vBottomWick = vOpen - vLow;
-			}
-			else{
-				vTopWick = vHigh - vOpen;
-				vBottomWick = vClose - vLow;
-			}
-			if((vBottomWick < vTopWick) && ((vBottomWick > 5) || (vTopWick > 5))){
-				fnInitiateManualFutures("buy");
-			}
-			else if((vTopWick < vBottomWick) && ((vBottomWick > 5) || (vTopWick > 5))){
-				fnInitiateManualFutures("sell");
-			}
-			else{
-				console.log("No Trade: " + vTopWick + " - " + vBottomWick);
-			}
-			// let vBodySize = Math.abs(vOpen - vClose);
-			// console.log(vBodySize);
+    if(isLsAutoTrader === "false"){
+        fnGenMessage("Trade Order Received, But Auto Trader is OFF!", "badge bg-warning", "spnGenMsg");
+    }
+    else{
+		let vOpen = parseFloat(document.getElementById("txtCandleOpen").value);
+		let vHigh = parseFloat(document.getElementById("txtCandleHigh").value);
+		let vLow = parseFloat(document.getElementById("txtCandleLow").value);
+		let vClose = parseFloat(document.getElementById("txtCandleClose").value);
+		let vBestBuy = parseFloat(objBestBuy.value);
+		let vBestSell = parseFloat(objBestSell.value);
+		let vTopWick = 0;
+		let vBottomWick = 0;
+		let vDefWickSize = 10;
 
-	        // //*********** Strategy Based Previous 5 Min Candle Size
-	        // let vCandleDef = vHigh - vLow;
+		if(vOpen < vClose){
+			vTopWick = vHigh - vClose;
+			vBottomWick = vOpen - vLow;
+		}
+		else{
+			vTopWick = vHigh - vOpen;
+			vBottomWick = vClose - vLow;
+		}
+		console.log(vTopWick + " - " + vBottomWick)
+		if((vBottomWick < vTopWick) && ((vBottomWick > vDefWickSize) || (vTopWick > vDefWickSize))){
+			fnInitiateManualFutures("sell");
+		}
+		else if((vTopWick < vBottomWick) && ((vBottomWick > vDefWickSize) || (vTopWick > vDefWickSize))){
+			fnInitiateManualFutures("buy");
+		}
+		else{
+			console.log("No Trade: " + vTopWick + " - " + vBottomWick);
+		}
+		// let vBodySize = Math.abs(vOpen - vClose);
+		// console.log(vBodySize);
 
-	        // if(vCandleDef > 70){
-	        // 	if(vBestBuy > vHigh){
-		    //         fnInitiateManualFutures("buy");
-	        // 	}
-	        // 	else if(vBestSell < vLow){
-		    //         fnInitiateManualFutures("sell");
-	        // 	}
-	        // 	else{
-	        // 		console.log("No Trade........");
-	        // 	}
-	        // }
-	        // //*********** Strategy Based Previous 5 Min Candle Size
-        }
-	}
-	// console.log(pTicData);
+        // //*********** Strategy Based Previous 5 Min Candle Size
+        // let vCandleDef = vHigh - vLow;
+
+        // if(vCandleDef > 70){
+        // 	if(vBestBuy > vHigh){
+	    //         fnInitiateManualFutures("buy");
+        // 	}
+        // 	else if(vBestSell < vLow){
+	    //         fnInitiateManualFutures("sell");
+        // 	}
+        // 	else{
+        // 		console.log("No Trade........");
+        // 	}
+        // }
+        // //*********** Strategy Based Previous 5 Min Candle Size
+    }
 }
 
 function fnUpdateOpnPosStatus(){
@@ -412,8 +558,11 @@ function fnGetCurrentRateTesting(){
 }
 
 function fnCheckBuySLTP(pCurrPrice){
+	let objSwtYet2Rec = document.getElementById("swtYetToRec");
     let vTotLossAmt = JSON.parse(localStorage.getItem("TotLossAmtDelta"));
     let vNewProfit = Math.abs(parseFloat(localStorage.getItem("TotLossAmtDelta")) * parseFloat(gMultiplierX));
+	let objCounterSwt = document.getElementById("swtTradeCounter");
+	let objBrkRec = document.getElementById("tdHeadBrkRec");
 
     if(vTotLossAmt === null || isNaN(vTotLossAmt)){
     	vTotLossAmt = 0;
@@ -422,21 +571,42 @@ function fnCheckBuySLTP(pCurrPrice){
     	vNewProfit = 0;
     }
 
+	// let vBrokTotLossRec = Math.abs(parseFloat(vTotLossAmt) - parseFloat(gCharges));
+	// objBrkRec.innerText = (vBrokTotLossRec).toFixed(2);
+
+    // console.log("vTotLossAmt: " + vTotLossAmt);
+	// console.log("gCharges: " + gCharges);
+	// console.log("vBrokTotLossRec: " + vBrokTotLossRec);
+	// console.log("gPL: " + gPL);
+
 	if(pCurrPrice <= gAmtSL){
-		// console.log("SL Hit");
 		fnCloseManualFutures(gByorSl);
 	}
-	else if((parseFloat(vTotLossAmt) < 0) && (parseFloat(gPL) > parseFloat(vNewProfit))){
+	else if((parseFloat(vTotLossAmt) < 0) && (parseFloat(gPL) > parseFloat(vNewProfit)) && (parseInt(gQty) > 10)){
 		// console.log("50 Profit Taken.............");
-		fnClosePrctTrade();
+		if(objSwtYet2Rec.checked){
+			fnClosePrctTrade();
+		}
 	}
+	// else if(parseFloat(gPL) >= vBrokTotLossRec){
+	// 	fnCloseManualFutures(gByorSl);
+	// }
 	else if(gTimeDiff < gMaxTradeTime){
 		// console.log("Timer Ending...");
-		fnCloseManualFutures(gByorSl);
+		if(objCounterSwt.checked){
+			fnCloseManualFutures(gByorSl);
+		}
 	}
-	else if(pCurrPrice >= gAmtTP){
+	else if((parseFloat(gAmtTP) > 0) && (parseFloat(gPL) >= parseFloat(gAmtTP))){
 		// console.log("TP Hit");
 		fnCloseManualFutures(gByorSl);
+	}
+	else if(parseFloat(pCurrPrice) >= parseFloat(gAmtTP1)){
+		// console.log("TP1 Hit");
+		if(g50Perc1Time){
+			g50Perc1Time = false;
+			fnClosePrctTrade();
+		}
 	}
 	else{
 		// console.log("Buy Trade is Still ON");
@@ -444,8 +614,11 @@ function fnCheckBuySLTP(pCurrPrice){
 }
 
 function fnCheckSellSLTP(pCurrPrice){
+	let objSwtYet2Rec = document.getElementById("swtYetToRec");
     let vTotLossAmt = JSON.parse(localStorage.getItem("TotLossAmtDelta"));
     let vNewProfit = Math.abs(parseFloat(localStorage.getItem("TotLossAmtDelta")) * parseFloat(gMultiplierX));
+	let objCounterSwt = document.getElementById("swtTradeCounter");
+	let objBrkRec = document.getElementById("tdHeadBrkRec");
 
     if(vTotLossAmt === null || isNaN(vTotLossAmt)){
     	vTotLossAmt = 0;
@@ -454,21 +627,43 @@ function fnCheckSellSLTP(pCurrPrice){
     	vNewProfit = 0;
     }
 
+	// let vBrokTotLossRec = Math.abs(parseFloat(vTotLossAmt) - parseFloat(gCharges));
+	// objBrkRec.innerText =  (vBrokTotLossRec).toFixed(2);
+
+    // console.log("vTotLossAmt: " + vTotLossAmt);
+	// console.log("gCharges: " + gCharges);
+	// console.log("vBrokTotLossRec: " + vBrokTotLossRec);
+	// console.log("gPL: " + gPL);
+
 	if(pCurrPrice >= gAmtSL){
 		// console.log("SL Hit");
 		fnCloseManualFutures(gByorSl);
 	}
-	else if((parseFloat(vTotLossAmt) < 0) && (parseFloat(gPL) > parseFloat(vNewProfit))){
+	else if((parseFloat(vTotLossAmt) < 0) && (parseFloat(gPL) > parseFloat(vNewProfit)) && (parseInt(gQty) > 10)){
 		// console.log("50 Profit Taken.............");
-		fnClosePrctTrade();
+		if(objSwtYet2Rec.checked){
+			fnClosePrctTrade();
+		}
 	}
+	// else if(parseFloat(gPL) >= vBrokTotLossRec){
+	// 	fnCloseManualFutures(gByorSl);
+	// }
 	else if(gTimeDiff < gMaxTradeTime){
 		// console.log("Timer Ending...");
-		fnCloseManualFutures(gByorSl);
+		if(objCounterSwt.checked){
+			fnCloseManualFutures(gByorSl);
+		}
 	}
-	else if(pCurrPrice <= gAmtTP){
+	else if((parseFloat(gAmtTP) > 0) && (parseFloat(gPL) >= parseFloat(gAmtTP))){
 		// console.log("TP Hit");
 		fnCloseManualFutures(gByorSl);
+	}
+	else if(parseFloat(pCurrPrice) <= parseFloat(gAmtTP1)){
+		// console.log("TP Hit");
+		if(g50Perc1Time){
+			g50Perc1Time = false;
+			fnClosePrctTrade();
+		}
 	}
 	else{
 		// console.log("Sell Trade is Still ON");
@@ -532,85 +727,111 @@ function fnGetHistoricalOHLC(){
 function fnLoadSlTp(){
     let objCurrSlTp = JSON.parse(localStorage.getItem("DeltaCurrFutSlTp"));
     let objTxtSL = document.getElementById("txtPointsSL");
-    let objTxtTP = document.getElementById("txtPointsTP");
+    let objTxtTP1 = document.getElementById("txtPointsTP1");
+    let objTxtTP = document.getElementById("txtAmountTP") || document.getElementById("txtPointsTP");
+
+    if(!objTxtSL || !objTxtTP1 || !objTxtTP){
+        return;
+    }
 
     if(objCurrSlTp === null){
-    	let objSlTp = { PointSL : 100, PointTP : 300 };
+    	let objSlTp = { PointSL : 200, PointTP1 : 300, AmountTP : 1000 };
     	localStorage.setItem("DeltaCurrFutSlTp", JSON.stringify(objSlTp));
-    	objTxtSL.value = 100;
-    	objTxtTP.value = 300;
+    	objTxtSL.value = 200;
+    	objTxtTP1.value = 300;
+    	objTxtTP.value = 1000;
     }
     else{
     	objTxtSL.value = objCurrSlTp.PointSL;
-    	objTxtTP.value = objCurrSlTp.PointTP;
+    	objTxtTP1.value = objCurrSlTp.PointTP1;
+    	objTxtTP.value = (objCurrSlTp.AmountTP !== undefined) ? objCurrSlTp.AmountTP : objCurrSlTp.PointTP;
     }
 }
 
 function fnUpdateSlTp(){
     let objTxtSL = document.getElementById("txtPointsSL");
-    let objTxtTP = document.getElementById("txtPointsTP");
+    let objTxtTP1 = document.getElementById("txtPointsTP1");
+    let objTxtTP = document.getElementById("txtAmountTP") || document.getElementById("txtPointsTP");
 
-    let objSlTp = { PointSL : objTxtSL.value, PointTP : objTxtTP.value };
+    if(!objTxtSL || !objTxtTP1 || !objTxtTP){
+        return;
+    }
+
+    let objSlTp = { PointSL : objTxtSL.value, PointTP1 : objTxtTP1.value, AmountTP : objTxtTP.value };
     localStorage.setItem("DeltaCurrFutSlTp", JSON.stringify(objSlTp));
 
     fnGenMessage("Updated SL & TP!", `badge bg-success`, "spnGenMsg");    
 }
 
 async function fnInitiateManualFutures(pTransType){
+    let isLsAutoTrader = localStorage.getItem("isDeltaAutoTrader");
+
     let objCurrPos = JSON.parse(localStorage.getItem("DeltaCurrFutPosiS"));
 
-    if (objCurrPos === null){
-        let objBestRates = await fnGetFutBestRates();
+    if(isLsAutoTrader === "true"){
+	    if (objCurrPos === null){
+	        let objBestRates = await fnGetFutBestRates();
 
-        if(objBestRates.status === "success"){
-            let vDate = new Date();
-            let vOrdId = vDate.valueOf();
-            let vMonth = vDate.getMonth() + 1;
-            let vToday = vDate.getDate() + "-" + vMonth + "-" + vDate.getFullYear() + " " + vDate.getHours() + ":" + vDate.getMinutes() + ":" + vDate.getSeconds();
+	        if(objBestRates.status === "success"){
+	            let vDate = new Date();
+	            let vOrdId = vDate.valueOf();
+	            let vMonth = vDate.getMonth() + 1;
+	            let vToday = vDate.getDate() + "-" + vMonth + "-" + vDate.getFullYear() + " " + vDate.getHours() + ":" + vDate.getMinutes() + ":" + vDate.getSeconds();
 
-		    let objFutDDL = document.getElementById("ddlFuturesSymbols");
-		    let objQty = document.getElementById("txtFuturesQty");
-		    let objLotSize = document.getElementById("txtLotSize");
-		    let vSLPoints = parseFloat(document.getElementById("txtPointsSL").value);
-		    let vTPPoints = parseFloat(document.getElementById("txtPointsTP").value);
-		    let vBestBuy = parseFloat(objBestRates.data.BestBuy);
-		    let vBestSell = parseFloat(objBestRates.data.BestSell);
-			
-			gByorSl = pTransType;
+			    let objFutDDL = document.getElementById("ddlFuturesSymbols");
+			    let objQty = document.getElementById("txtFuturesQty");
+			    let objLotSize = document.getElementById("txtLotSize");
+			    let vSLPoints = parseFloat(document.getElementById("txtPointsSL").value);
+			    let vTPPoints1 = parseFloat(document.getElementById("txtPointsTP1").value);
+			    let objTPAmount = document.getElementById("txtAmountTP") || document.getElementById("txtPointsTP");
+			    let vTPAmount = parseFloat(objTPAmount ? objTPAmount.value : NaN);
+			    let vBestBuy = parseFloat(objBestRates.data.BestBuy);
+			    let vBestSell = parseFloat(objBestRates.data.BestSell);
+				
+				gByorSl = pTransType;
 
-			if(gByorSl === "buy"){
-                gAmtSL = (vBestBuy - vSLPoints).toFixed(2);
-                gAmtTP = (vBestBuy + vTPPoints).toFixed(2);
-			}
-			else if(gByorSl === "sell"){
-                gAmtSL = (vBestBuy + vSLPoints).toFixed(2);
-                gAmtTP = (vBestBuy - vTPPoints).toFixed(2);
-			}
-			else{
-				gAmtSL = 0;
-				gAmtTP = 0;				
-			}
+				if(gByorSl === "buy"){
+	                gAmtSL = (vBestBuy - vSLPoints).toFixed(2);
+	                gAmtTP1 = (vBestBuy + vTPPoints1).toFixed(2);
+	                gAmtTP = Number.isFinite(vTPAmount) ? vTPAmount : 0;
+				}
+				else if(gByorSl === "sell"){
+	                gAmtSL = (vBestBuy + vSLPoints).toFixed(2);
+	                gAmtTP1 = (vBestBuy - vTPPoints1).toFixed(2);
+	                gAmtTP = Number.isFinite(vTPAmount) ? vTPAmount : 0;
+				}
+				else{
+					gAmtSL = 0;
+					gAmtTP1 = 0;				
+					gAmtTP = 0;				
+				}
 
-            let vExcTradeDtls = { TradeData: [{ OrderID : vOrdId, OpenDT : vToday, FutSymbol : objFutDDL.value, TransType : pTransType, LotSize : objLotSize.value, Qty : objQty.value, BuyPrice : vBestBuy, SellPrice : vBestSell, AmtSL : gAmtSL, AmtTP : gAmtTP, StopLossPts: vSLPoints, TakeProfitPts : vTPPoints, OpenDTVal : vOrdId }] };
-            let objExcTradeDtls = JSON.stringify(vExcTradeDtls);
-            gCurrPos = vExcTradeDtls;
+	            let vExcTradeDtls = { TradeData: [{ OrderID : vOrdId, OpenDT : vToday, FutSymbol : objFutDDL.value, TransType : pTransType, LotSize : objLotSize.value, Qty : objQty.value, BuyPrice : vBestBuy, SellPrice : vBestSell, AmtSL : gAmtSL, AmtTP1 : gAmtTP1, AmtTP : gAmtTP, StopLossPts: vSLPoints, TakeProfitAmt : vTPAmount, OpenDTVal : vOrdId }] };
+	            let objExcTradeDtls = JSON.stringify(vExcTradeDtls);
+	            gCurrPos = vExcTradeDtls;
 
-            localStorage.setItem("DeltaCurrFutPosiS", objExcTradeDtls);
-			localStorage.setItem("QtyMulDelta", objQty.value);
+	            localStorage.setItem("DeltaCurrFutPosiS", objExcTradeDtls);
+				localStorage.setItem("QtyMulDelta", objQty.value);
+		    	g50Perc1Time = true;
 
-            fnSetInitFutTrdDtls();
+	            fnSetInitFutTrdDtls();
+	            fnSubscribe();
 
-            fnGenMessage(objBestRates.message, `badge bg-${objBestRates.status}`, "spnGenMsg");
-            document.getElementById("spnLossTrd").className = "badge rounded-pill text-bg-success";
+	            fnGenMessage(objBestRates.message, `badge bg-${objBestRates.status}`, "spnGenMsg");
+	            document.getElementById("spnLossTrd").className = "badge rounded-pill text-bg-success";
 
-            // console.log("Trade Executed....................");
-        }
-        else{
-            fnGenMessage(objBestRates.message, `badge bg-${objBestRates.status}`, "spnGenMsg");
-        }
+	            // console.log("Trade Executed....................");
+	        }
+	        else{
+	            fnGenMessage(objBestRates.message, `badge bg-${objBestRates.status}`, "spnGenMsg");
+	        }
+	    }
+	    else{
+	        fnGenMessage("Close the Open Position to Execute New Trade!", `badge bg-warning`, "spnGenMsg");
+	    }
     }
     else{
-        fnGenMessage("Close the Open Position to Execute New Trade!", `badge bg-warning`, "spnGenMsg");
+	        fnGenMessage("Trade not Executed, Auto Trade is Off!", `badge bg-warning`, "spnGenMsg");
     }
 }
 
@@ -643,9 +864,10 @@ function fnSetInitFutTrdDtls(){
 		gSellPrice = parseFloat(gCurrPos.TradeData[0].SellPrice).toFixed(2);
 		gLotSize = parseFloat(gCurrPos.TradeData[0].LotSize);
 		gQty = parseFloat(gCurrPos.TradeData[0].Qty);
-        gByorSl = gCurrPos.TradeData[0].TransType;
+		gByorSl = gCurrPos.TradeData[0].TransType;
 		gAmtSL = gCurrPos.TradeData[0].AmtSL;
-		gAmtTP = gCurrPos.TradeData[0].AmtTP;
+		gAmtTP1 = gCurrPos.TradeData[0].AmtTP1;
+		gAmtTP = (gCurrPos.TradeData[0].TakeProfitAmt !== undefined) ? gCurrPos.TradeData[0].TakeProfitAmt : gCurrPos.TradeData[0].AmtTP;
 
 		objDateTime.innerText = gCurrPos.TradeData[0].OpenDT;
 		objSymbol.innerText = gCurrPos.TradeData[0].FutSymbol;
@@ -690,6 +912,42 @@ function fnSetInitFutTrdDtls(){
 
 		gByorSl = "";
 	}
+}
+
+function fnManualSubStart(){
+	fnManualSubcription();
+	clearInterval(gManualSubIntvl);
+	gManualSubIntvl = setInterval(fnManualSubcription, 8000);
+}
+
+async function fnManualSubcription(){
+    let objBestRates = await fnGetFutBestRates();
+    if(objBestRates.status === "success"){
+    	let objBestBuy = document.getElementById("txtBestBuyPrice");
+		let objBestSell = document.getElementById("txtBestSellPrice");
+
+	    objBestBuy.value = parseFloat(objBestRates.data.BestBuy);
+	    objBestSell.value = parseFloat(objBestRates.data.BestSell);
+    	
+		if(gCurrPos !== null){
+			fnUpdateOpnPosStatus();
+		}
+		console.log("Manual Rates Started.....")
+    }
+	else{
+
+	}
+}
+
+function fnManualSubStop(){
+	clearInterval(gManualSubIntvl);
+	console.log("Manual Rates Stopped.....");
+
+   	let objBestBuy = document.getElementById("txtBestBuyPrice");
+	let objBestSell = document.getElementById("txtBestSellPrice");
+
+	objBestBuy.value = "";
+	objBestSell.value= "";
 }
 
 function fnGetFutBestRates(){
@@ -787,7 +1045,7 @@ async function fnClosePrctTrade(){
             fnGenMessage("No Open Positions to Close 50% Qty!", `badge bg-warning`, "spnGenMsg");
         }
         else{
-            let vPrctQty2Rec = (Math.round(parseInt(gCurrPos.TradeData[0].Qty) * parseFloat(gLossRecPerct)) / 100);
+            let vPrctQty2Rec = (Math.round(parseInt(gCurrPos.TradeData[0].Qty) * parseInt(gLossRecPerct)) / 100);
             let objClsTrd = await fnInnitiateClsFutTrade(vPrctQty2Rec);
 
             if(objClsTrd.status === "success"){
@@ -882,6 +1140,7 @@ async function fnInnitiateClsFutTrade(pQty){
 	    else{
 	    	if(vToCntuQty === 0){
 			    localStorage.removeItem("DeltaCurrFutPosiS");
+
 			    gCurrPos = null;
 	    	}
 	    	else{
@@ -902,7 +1161,9 @@ async function fnInnitiateClsFutTrade(pQty){
     return objClsTrd;
 }
 
+//************* Yet To Recover Adjustment **************//
 function fnSetNextOptTradeSettings(){
+	let objSwtYet2Rec = document.getElementById("swtYetToRec");
     let objQty = document.getElementById("txtFuturesQty");
     let vOldLossAmt = localStorage.getItem("OldPLAmtDelta");
 	let vNewLossAmt = localStorage.getItem("NewPLAmtDelta");
@@ -910,28 +1171,57 @@ function fnSetNextOptTradeSettings(){
 
     let vOldQtyMul = JSON.parse(localStorage.getItem("QtyMulDelta"));
     let vStartLots = JSON.parse(localStorage.getItem("StartQtyNoDelta"));
+    let objSwtMarti = document.getElementById("swtMartingale");
 
-	if(parseFloat(vNewLossAmt) < 0){
-        let vNextQty = parseInt(vOldQtyMul) * 2;
-        localStorage.setItem("QtyMulDelta", vNextQty);
-        objQty.value = vNextQty;
-	}
-	else if(parseFloat(vTotLossAmt) < 0){
-        let vDivAmt = parseFloat(vTotLossAmt) / parseFloat(vOldLossAmt);
-        let vNextQty = Math.round(vDivAmt * parseInt(vOldQtyMul));
+    if(objSwtMarti.checked){
+		if(parseFloat(vNewLossAmt) < 0){
+	        // let vNextQty = parseInt(vOldQtyMul) * 2;
+	        let vNextQty = parseInt(vOldQtyMul) + parseInt(vStartLots);
+	        localStorage.setItem("QtyMulDelta", vNextQty);
+	        objQty.value = vNextQty;
+		}
+		else if(parseFloat(vTotLossAmt) < 0){
+	        let vDivAmt = parseFloat(vTotLossAmt) / parseFloat(vOldLossAmt);
+	        let vNextQty = Math.round(vDivAmt * parseInt(vOldQtyMul));
 
-        if(vNextQty < vStartLots)
-        vNextQty += vStartLots;
+	        if(vNextQty < vStartLots)
+	        vNextQty += vStartLots;
 
-        localStorage.setItem("QtyMulDelta", vNextQty);
-        objQty.value = vNextQty;
-	}
-    else {
-        localStorage.setItem("TotLossAmtDelta", 0);
-        localStorage.removeItem("QtyMulDelta");
-        // localStorage.setItem("TradeStep", 0);
+	        localStorage.setItem("QtyMulDelta", vNextQty);
+	        objQty.value = vNextQty;
+		}
+	    else {
+	        localStorage.setItem("TotLossAmtDelta", 0);
+	        localStorage.removeItem("QtyMulDelta");
+	        // localStorage.setItem("TradeStep", 0);
+	        fnSetLotsByQtyMulLossAmt();
+	    }
+    }
+    else{
+    	if(parseFloat(vTotLossAmt) > 0){
+			localStorage.setItem("TotLossAmtDelta", 0);
+    	}
+    	
         fnSetLotsByQtyMulLossAmt();
     }
+
+	// console.log(gCharges);
+    //************* for Brokerage and any loss as minimum target
+	if((gPL > 0) && (objSwtYet2Rec.checked)){
+		let vBalLossAmt = localStorage.getItem("TotLossAmtDelta");
+		let vNewTarget = parseFloat(vBalLossAmt) - parseFloat(gCharges);
+		localStorage.setItem("TotLossAmtDelta", vNewTarget);
+		// console.log("ADD Brokerage");
+	}
+	// console.log(localStorage.getItem("TotLossAmtDelta"))
+}
+
+function fnChangeMartingale(){
+    // let vMartiM = JSON.parse(localStorage.getItem("DeltaFutMarti"));
+    let objSwtMarti = document.getElementById("swtMartingale");
+
+    localStorage.setItem("DeltaFutMarti", JSON.stringify(objSwtMarti.checked));
+    // alert(objSwtMarti.checked);
 }
 
 function fnSetLotsByQtyMulLossAmt(){
@@ -956,6 +1246,35 @@ function fnSetLotsByQtyMulLossAmt(){
     else {
         objOptQty.value = vQtyMul;
     }
+}
+
+// function fnTest(){
+// 	console.log("Total Loss in Momory: " + localStorage.getItem("TotLossAmtDelta"));
+// 	console.log("gPL: " + gPL);
+// }
+
+function fnTest(){
+	console.log(localStorage.getItem("TrdBkFut"));
+}
+
+function fnDeleteThisTrade(pOrderID){
+   	let objTradeBook = JSON.parse(localStorage.getItem("TrdBkFut"));
+    let vDelRec = null;
+
+   	if(confirm("Are You Sure, You Want to Delete This Leg!")){
+        for(let i=0; i<objTradeBook.TradeData.length; i++){
+            if(objTradeBook.TradeData[i].OrderID === pOrderID){
+                vDelRec = i;
+            }
+        }
+
+
+        objTradeBook.TradeData.splice(vDelRec, 1);
+
+        let objExcTradeDtls = JSON.stringify(objTradeBook);
+        localStorage.setItem("TrdBkFut", objExcTradeDtls);
+        fnLoadTodayTrades();
+   	}
 }
 
 function fnLoadTodayTrades(){
@@ -1067,8 +1386,10 @@ function fnClearLocalStorageTemp(){
     localStorage.removeItem("DeltaCurrFutPosiS");
 	localStorage.removeItem("TrdBkFut");
 	localStorage.removeItem("StartQtyNoDelta");
+	localStorage.removeItem("DeltaFutMarti");
 	localStorage.setItem("QtyMulDelta", 0);
 	localStorage.setItem("TotLossAmtDelta", 0);
+	localStorage.removeItem("DeltaCurrFutSlTp");
     clearInterval(gTimerID);
 
 	fnGetAllStatus();
@@ -1111,11 +1432,6 @@ function fnStartTimer(duration, display) {
     gTimerID = setInterval(timer, 1000);
 }
 
-function fnTest(){
-	console.log("Total Loss in Momory: " + localStorage.getItem("TotLossAmtDelta"));
-	console.log("gPL: " + gPL);
-}
-
 function fnPositionStatus(){
     let objBtnPosition = document.getElementById("btnPositionStatus");
 
@@ -1156,4 +1472,59 @@ function fnLoadTradeSide(){
     else{
         objTradeSideVal.value = -1;
     }
+}
+
+
+//********** Sample Code to Place Order *************//
+function fnPlaceLimitOrder(){
+    let objApiKey = document.getElementById("txtUserAPIKey");
+    let objApiSecret = document.getElementById("txtAPISecret");
+    let objFutDDL = document.getElementById("ddlFuturesSymbols");
+    let objClientOrderId = document.getElementById("hidClientOrderId");
+
+    let vDate = new Date();
+    let vOrdId = vDate.valueOf();
+    objClientOrderId.value = vOrdId;
+
+    let vHeaders = new Headers();
+    vHeaders.append("Content-Type", "application/json");
+
+    let vAction = JSON.stringify({ ApiKey : objApiKey.value, ApiSecret : objApiSecret.value, ClientOrderID : vOrdId });
+
+    let requestOptions = {
+        method: 'POST',
+        headers: vHeaders,
+        body: vAction,
+        redirect: 'follow'
+    };
+
+    fetch("/deltaExcFut/placeLimitOrder", requestOptions)
+    .then(response => response.json())
+    .then(objResult => {
+        if(objResult.status === "success"){
+
+        	console.log(objResult);
+            // let objBestRates = { BestBuy : vRes.result.quotes.best_ask, BestSell : vRes.result.quotes.best_bid }
+
+            fnGenMessage(objResult.message, `badge bg-${objResult.status}`, "spnGenMsg");
+        }
+        else if(objResult.status === "danger"){
+        	console.log(objResult);
+            if(objResult.data.response.body.error.code === "ip_not_whitelisted_for_api_key"){
+	            fnGenMessage(objResult.data.response.body.error.code + " for IP: " + objResult.data.response.body.error.context.client_ip, `badge bg-${objResult.status}`, "spnGenMsg");
+            }
+            else{
+	            fnGenMessage(objResult.message, `badge bg-${objResult.status}`, "spnGenMsg");
+            }
+        }
+        else if(objResult.status === "warning"){
+            fnGenMessage(objResult.message, `badge bg-${objResult.status}`, "spnGenMsg");
+        }
+        else{
+            fnGenMessage("Error in Placing Limit Order!", `badge bg-danger`, "spnGenMsg");
+        }
+    })
+    .catch(error => {
+        fnGenMessage(error.message, `badge bg-danger`, "spnGenMsg");
+    });
 }
