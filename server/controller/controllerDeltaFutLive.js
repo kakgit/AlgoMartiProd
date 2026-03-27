@@ -243,6 +243,11 @@ exports.fnEditOrderSDK = async (req, res) => {
         }
     }
     catch(objError){
+        const vErrCode = objError?.response?.body?.error?.code || objError?.response?.obj?.error?.code || objError?.response?.data?.error?.code || "";
+        if(vErrCode === "open_order_not_found"){
+            res.send({ "status": "success", "message": "Order already closed/cancelled on exchange.", "data": { success: true, ignored: true, error_code: vErrCode } });
+            return;
+        }
         res.send({ "status": "danger", "message": objError?.response?.data || objError.message, "data": objError });
     }
 }
@@ -278,8 +283,13 @@ exports.fnCancelOrderSDK = async (req, res) => {
             }
         })
         .catch(function(objError) {
+            const vErrCode = objError?.response?.body?.error?.code || objError?.response?.obj?.error?.code || objError?.response?.data?.error?.code || "";
+            if(vErrCode === "open_order_not_found"){
+                res.send({ "status": "success", "message": "Order already closed/cancelled on exchange.", "data": { success: true, ignored: true, error_code: vErrCode } });
+                return;
+            }
             console.log(objError);
-            res.send({ "status": "danger", "message": objError.response.text, "data": objError });
+            res.send({ "status": "danger", "message": objError?.response?.text || objError?.message || "Cancel order failed", "data": objError });
         });
     });
     // res.send({ "status": "success", "message": "Pending Order Cancelled!", "data": "" });
